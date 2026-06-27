@@ -103,19 +103,77 @@ template into a test project and install `TngTech.ArchUnitNET.xUnit` (or the
 equivalent for the team's test framework). Adjust namespaces in the template
 to match the target project.
 
+## Bootstrapping with Aspire
+
+New solutions should be bootstrapped and configured using **Aspire**. Aspire
+provides the AppHost that orchestrates local development — databases, caches,
+messaging, and service discovery are all modeled in one place.
+
+### How this skill interacts with the Aspire skills
+
+This skill owns the Clean Architecture structure and patterns. For Aspire
+operations, delegate to the appropriate Aspire skill:
+
+| Task | Delegate to |
+|------|-------------|
+| Initialize Aspire in the solution | `aspire init` via the **aspire** skill |
+| Wire up the AppHost after init | The **aspireify** skill |
+| Start/stop/inspect resources | The **aspire** skill |
+| Add integrations (Postgres, Redis, etc.) | `aspire add` via the **aspire** skill |
+
+### Bootstrapping a new Clean Architecture solution
+
+When creating a new solution from scratch:
+
+1. Create the solution and project structure (folders or projects per the
+   user's preference).
+2. Generate base types from [templates/](templates/).
+3. Run `aspire init` to drop the AppHost skeleton into the solution.
+4. Hand off to the **aspireify** skill to complete AppHost wiring — it will
+   model the API project, add database resources, configure service discovery,
+   and set up dev certificates.
+5. Use `aspire add` to bring in integrations the solution needs (e.g.,
+   `Aspire.Hosting.PostgreSQL`, `Aspire.Hosting.Redis`).
+6. Use `aspire start` to verify the full stack runs locally.
+
+### Infrastructure layer and Aspire integrations
+
+When Aspire manages a resource (e.g., a PostgreSQL container), the
+Infrastructure layer still owns the EF Core `DbContext` and repository
+implementations. The difference is that **connection strings come from Aspire**
+via standard .NET configuration (`ConnectionStrings:__resourcename`) rather
+than being hardcoded or manually configured.
+
+This means:
+- Infrastructure registers its `DbContext` reading from `IConfiguration`
+- The AppHost wires resources with `WithReference(db)` so connection strings
+  are injected automatically
+- No connection strings in `appsettings.json` for local dev — Aspire handles it
+- Production deployment uses the same configuration keys, provisioned differently
+
+### When Aspire is not available
+
+If the user's environment does not have the Aspire CLI or they explicitly opt
+out, fall back to manual configuration (connection strings in appsettings,
+Docker Compose, etc.). The Clean Architecture patterns remain the same — only
+the bootstrapping and local orchestration differ.
+
 ## Default workflow
 
-1. If base types don't exist in the solution, generate them from the templates.
-2. Identify which layer(s) the change touches.
-3. Work outward: Domain → Application → Infrastructure → Presentation.
-4. For a new feature, create in order:
+1. Bootstrap the solution with Aspire (if available): `aspire init`, then
+   delegate to the **aspireify** skill to complete wiring.
+2. If base types don't exist in the solution, generate them from the templates.
+3. Identify which layer(s) the change touches.
+4. Work outward: Domain → Application → Infrastructure → Presentation.
+5. For a new feature, create in order:
    - Domain entity/value object (if new)
    - Command or Query record implementing `ICommand<T>` or `IQuery<T>`
    - Handler class implementing `ICommandHandler` or `IQueryHandler`
    - Infrastructure persistence (EF config, repository if needed)
    - API endpoint that instantiates and calls the handler directly
-5. Use the Result pattern — never throw exceptions for business rule violations.
-6. Register handlers in DI as scoped services.
+6. Use the Result pattern — never throw exceptions for business rule violations.
+7. Register handlers in DI as scoped services.
+8. Use `aspire start` to verify changes work end-to-end locally.
 
 ## Key rules
 
