@@ -34,7 +34,7 @@ do not reference a shared abstractions library.
 ```
 src/
 ├── Domain/
-│   ├── Abstractions/        # Base types (generated from templates below)
+│   ├── Abstractions/        # Base types (generated from templates)
 │   ├── Entities/
 │   ├── ValueObjects/
 │   ├── Events/
@@ -53,177 +53,31 @@ src/
     └── Endpoints/
 ```
 
-## Base types — generate from templates
+## Generating base types from templates
 
-When scaffolding a new solution or when these types are missing, generate them
-directly into `Domain/Abstractions/` and `Application/Abstractions/`. Do NOT
-create a shared library or NuGet package for these.
+When scaffolding a new solution or when these types are missing, read the
+template files from [templates/](templates/) in this skill directory and
+generate each file into the appropriate project layer, adjusting the namespace
+to match the target project. Do NOT create a shared library or NuGet package
+for these.
 
-### Domain/Abstractions/Entity.cs
-
-```csharp
-public abstract class Entity<TId> : IEquatable<Entity<TId>>
-    where TId : notnull
-{
-    protected Entity(TId id) => Id = id;
-    protected Entity() { } // EF Core
-
-    public TId Id { get; init; }
-
-    private readonly List<IDomainEvent> _domainEvents = [];
-    public IReadOnlyList<IDomainEvent> DomainEvents => _domainEvents.AsReadOnly();
-
-    public void Raise(IDomainEvent domainEvent) => _domainEvents.Add(domainEvent);
-    public void ClearDomainEvents() => _domainEvents.Clear();
-
-    public bool Equals(Entity<TId>? other) =>
-        other is not null && Id.Equals(other.Id);
-
-    public override bool Equals(object? obj) =>
-        obj is Entity<TId> entity && Equals(entity);
-
-    public override int GetHashCode() => Id.GetHashCode();
-}
-```
-
-### Domain/Abstractions/IDomainEvent.cs
-
-```csharp
-public interface IDomainEvent
-{
-    Guid EventId { get; }
-    DateTime OccurredOnUtc { get; }
-}
-```
-
-### Domain/Abstractions/DomainEvent.cs
-
-```csharp
-public abstract record DomainEvent : IDomainEvent
-{
-    public Guid EventId { get; init; } = Guid.NewGuid();
-    public DateTime OccurredOnUtc { get; init; } = DateTime.UtcNow;
-}
-```
-
-### Domain/Abstractions/ValueObject.cs
-
-```csharp
-public abstract class ValueObject : IEquatable<ValueObject>
-{
-    protected abstract IEnumerable<object> GetAtomicValues();
-
-    public bool Equals(ValueObject? other) =>
-        other is not null &&
-        GetAtomicValues().SequenceEqual(other.GetAtomicValues());
-
-    public override bool Equals(object? obj) =>
-        obj is ValueObject vo && Equals(vo);
-
-    public override int GetHashCode() =>
-        GetAtomicValues().Aggregate(0, HashCode.Combine);
-}
-```
-
-### Domain/Abstractions/Result.cs
-
-```csharp
-public class Result
-{
-    protected Result(bool isSuccess, Error error)
-    {
-        if (isSuccess && error != Error.None)
-            throw new InvalidOperationException();
-        if (!isSuccess && error == Error.None)
-            throw new InvalidOperationException();
-
-        IsSuccess = isSuccess;
-        Error = error;
-    }
-
-    public bool IsSuccess { get; }
-    public bool IsFailure => !IsSuccess;
-    public Error Error { get; }
-
-    public static Result Success() => new(true, Error.None);
-    public static Result Failure(Error error) => new(false, error);
-    public static Result<TValue> Success<TValue>(TValue value) => new(value, true, Error.None);
-    public static Result<TValue> Failure<TValue>(Error error) => new(default, false, error);
-}
-
-public class Result<TValue> : Result
-{
-    private readonly TValue? _value;
-
-    protected internal Result(TValue? value, bool isSuccess, Error error)
-        : base(isSuccess, error) => _value = value;
-
-    public TValue Value => IsSuccess
-        ? _value!
-        : throw new InvalidOperationException("No value on failure result.");
-}
-```
-
-### Domain/Abstractions/Error.cs
-
-```csharp
-public sealed record Error(string Code, string Description)
-{
-    public static readonly Error None = new(string.Empty, string.Empty);
-    public static readonly Error NullValue = new("Error.NullValue", "A null value was provided.");
-}
-```
-
-### Application/Abstractions/ICommand.cs
-
-```csharp
-public interface ICommand<TResponse>
-{
-    // Marker interface — represents a state-changing use case
-}
-```
-
-### Application/Abstractions/IQuery.cs
-
-```csharp
-public interface IQuery<TResponse>
-{
-    // Marker interface — represents a read-only use case
-}
-```
-
-### Application/Abstractions/ICommandHandler.cs
-
-```csharp
-public interface ICommandHandler<in TCommand, TResponse>
-    where TCommand : ICommand<TResponse>
-{
-    Task<Result<TResponse>> Handle(TCommand command, CancellationToken ct = default);
-}
-```
-
-### Application/Abstractions/IQueryHandler.cs
-
-```csharp
-public interface IQueryHandler<in TQuery, TResponse>
-    where TQuery : IQuery<TResponse>
-{
-    Task<Result<TResponse>> Handle(TQuery query, CancellationToken ct = default);
-}
-```
-
-### Application/Abstractions/IUnitOfWork.cs
-
-```csharp
-public interface IUnitOfWork
-{
-    Task<int> SaveChangesAsync(CancellationToken ct = default);
-}
-```
+| Template file | Target location |
+|---------------|-----------------|
+| `Entity.cs` | `Domain/Abstractions/` |
+| `IDomainEvent.cs` | `Domain/Abstractions/` |
+| `DomainEvent.cs` | `Domain/Abstractions/` |
+| `ValueObject.cs` | `Domain/Abstractions/` |
+| `Result.cs` | `Domain/Abstractions/` |
+| `Error.cs` | `Domain/Abstractions/` |
+| `ICommand.cs` | `Application/Abstractions/` |
+| `IQuery.cs` | `Application/Abstractions/` |
+| `ICommandHandler.cs` | `Application/Abstractions/` |
+| `IQueryHandler.cs` | `Application/Abstractions/` |
+| `IUnitOfWork.cs` | `Application/Abstractions/` |
 
 ## Default workflow
 
-1. If base types don't exist in the solution, generate them from the templates above.
+1. If base types don't exist in the solution, generate them from the templates.
 2. Identify which layer(s) the change touches.
 3. Work outward: Domain → Application → Infrastructure → Presentation.
 4. For a new feature, create in order:
