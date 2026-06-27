@@ -31,6 +31,22 @@ do not reference a shared abstractions library.
 
 ## Solution structure
 
+Layers are logical boundaries — they do not have to map 1:1 to separate projects.
+A single project with folder-based separation is a valid starting point; the
+dependency rule (Domain ← Application ← Infrastructure/Presentation) can be
+enforced with architecture tests (e.g. NetArchTest, ArchUnitNET) rather than
+project references.
+
+When discussing structure with the user, explain the trade-offs:
+- **Folder-based (single project)**: Lower ceremony, faster to scaffold, suits
+  smaller bounded contexts. Enforce layering via architecture tests.
+- **Project-based (multi-project)**: Compiler-enforced dependency boundaries,
+  suits larger teams or independently deployable modules.
+
+Prefer folder-based unless the user explicitly requests separate projects.
+
+### Folder layout (single project or per-layer projects)
+
 ```
 src/
 ├── Domain/
@@ -91,8 +107,9 @@ for these.
 
 ## Key rules
 
-- Never reference Infrastructure or Presentation from Domain or Application.
-- Application depends only on Domain.
+- The dependency rule flows inward: Domain knows nothing; Application depends
+  only on Domain; Infrastructure and Presentation depend on Application.
+- Enforce this via architecture tests — project separation is optional.
 - All external dependencies are behind interfaces defined in Application.
 - Base types are owned by each project — never import them from a shared package.
 - Use sealed classes where inheritance isn't needed.
