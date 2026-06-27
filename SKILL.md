@@ -90,6 +90,18 @@ for these.
 | `ICommandHandler.cs` | `Application/Abstractions/` |
 | `IQueryHandler.cs` | `Application/Abstractions/` |
 | `IUnitOfWork.cs` | `Application/Abstractions/` |
+| `LayerDependencyTests.cs` | `tests/ArchitectureTests/` |
+
+## Architecture tests
+
+The dependency rule is enforced with architecture tests, not project references.
+For detailed guidance on setup, tooling, and the rules to implement, see
+[references/architecture-tests.md](references/architecture-tests.md).
+
+When scaffolding a new solution, generate `LayerDependencyTests.cs` from the
+template into a test project and install `TngTech.ArchUnitNET.xUnit` (or the
+equivalent for the team's test framework). Adjust namespaces in the template
+to match the target project.
 
 ## Default workflow
 
